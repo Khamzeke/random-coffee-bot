@@ -1,0 +1,4 @@
+aiogram~=2.18
+psycopg2
+asyncio~=3.4.3
+aioschedule~=0.5.2
