@@ -152,14 +152,13 @@ async def searching():
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
-        await asyncio.sleep(300)
-        if datetime.now().weekday() == 3:  # monday and after 17:00
+        if datetime.now().weekday() == 5:  # monday and after 17:00
             database.clearAppointments()
             sheet_base.inputUsers(database.getUsers(), len(database.getUsers()))
             await findCompanion()
             sheet_base.inputAppointments(database.getAppointments(), len(database.getAppointments()))
-        await asyncio.sleep(600)
-        if datetime.now().weekday() == 3:  # wednesday and after 14:00
+        await asyncio.sleep(15)
+        if datetime.now().weekday() == 5:  # wednesday and after 14:00
             users = database.getUsersByReadyStatus(False)
             for user in users:
                 if database.getUserLastAppointment(user[0]) is not None:
@@ -173,8 +172,8 @@ async def searching():
                                                reply_markup=InlineKeyboardMarkup().add(findNewBtn))
                     except:
                         print(f'[ERROR] The user {user[0]} blocked the bot')
-        await asyncio.sleep(600)
-        if datetime.now().weekday() == 3:  # datetime.now().weekday() == 5 and datetime.now().hour == 14 and
+        await asyncio.sleep(15)
+        if datetime.now().weekday() == 5:  # datetime.now().weekday() == 5 and datetime.now().hour == 14 and
             # datetime.now().minute = 3
             users = database.getUsersByReadyStatus(False)
             for user in users:
@@ -190,7 +189,7 @@ async def searching():
                     except:
                         print(f'[ERROR] The user {user[0]} blocked the bot')
             #database.execute(f"update users set ready=true where answer_date<= '{date.today()}'")
-        await asyncio.sleep(20)
+        await asyncio.sleep(120)
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('choice:'))
@@ -213,10 +212,12 @@ async def getChoice(callback_query: types.CallbackQuery):
         await callback_query.message.answer('Ок, записал! 👌\nНапишу тебе через месяц!')
     yes_btn = InlineKeyboardButton('Да, состоялась!', callback_data='event:yes')
     no_btn = InlineKeyboardButton('Нет, не состоялось...', callback_data='event:no')
-    kb = InlineKeyboardMarkup().add(*[yes_btn, no_btn])
-    await callback_query.message.answer(f'Небольшой опрос.\n'
-                                        f'Состоялась ли встреча с {database.getUserCompanion(callback_query.from_user.id)[1]}?', reply_markup=kb)
-
+    kb = InlineKeyboardMarkup(row_width=1).add(*[yes_btn, no_btn])
+    try:
+        await callback_query.message.answer(f'Небольшой опрос.\n'
+                                            f'Состоялась ли встреча с {database.getUserCompanion(callback_query.from_user.id)[1]}?', reply_markup=kb)
+    except:
+        print(f"[LOG] Survey error {database.getUserCompanion(callback_query.from_user.id)}")
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('event:'))
 async def eventListen(callback_query: types.CallbackQuery):
@@ -228,10 +229,43 @@ async def eventListen(callback_query: types.CallbackQuery):
         await callback_query.message.answer('Вы встретились вживую или онлайн?', reply_markup=InlineKeyboardMarkup().add(*[offline_btn,online_btn]))
     elif callback_query.data == 'event:no':
         await callback_query.message.edit_text(text+'\n\n👉 Нет, не состоялось...')
-        ignored_btn = InlineKeyboardButton('Не отвечал на сообщения', callback_data='event:online')
-        _btn = InlineKeyboardButton('Вживую', callback_data='event:offline')
+        ignored_btn = InlineKeyboardButton('Не отвечал на сообщения', callback_data='event:ignored')
+        mad_btn = InlineKeyboardButton('Не получилось...', callback_data='event:mad')
+        dated_btn = InlineKeyboardButton('Мы договорились, встретимся попозже!', callback_data='event:dated')
         await callback_query.message.answer('Чтобы лучше понимать, какую пару для тебя подбирать, расскажи, почему не подошел этот собеседник?',
-                                            reply_markup=InlineKeyboardMarkup().add(*[]))
+                                            reply_markup=InlineKeyboardMarkup(row_width=1).add(ignored_btn, mad_btn, dated_btn))
+    elif callback_query.data == 'event:online':
+        await callback_query.message.edit_text(text+'\n\n👉 Онлайн')
+        appointment = database.getUserLastAppointment(callback_query.from_user.id)
+        if appointment is not None:
+            database.setAppointmentHappened(appointment[0], True, 'Онлайн')
+        await callback_query.message.answer("Спасибо, что уделил минутку!\nЭтот опрос в конце недели крайне важен,"
+                                            " он помогает нам становиться лучше \n\n"
+                                            "На связи!")
+    elif callback_query.data == 'event:offline':
+        await callback_query.message.edit_text(text+'\n\n👉 Вживую')
+        appointment = database.getUserLastAppointment(callback_query.from_user.id)
+        if appointment is not None:
+            database.setAppointmentHappened(appointment[0], True, 'Офлайн')
+        await callback_query.message.answer("Спасибо, что уделил минутку!\nЭтот опрос в конце недели крайне важен,"
+                                            " он помогает нам становиться лучше \n\n"
+                                            "На связи!")
+    elif callback_query.data == 'event:ignored' or callback_query.data == 'event:mad' or callback_query.data == 'event:dated':
+        if callback_query.data == 'event:ignored':
+            msg = 'Не отвечал на сообщения'
+        elif callback_query.data == 'event:mad':
+            msg = 'Не получилось...'
+        else:
+            msg = 'Мы договорились, встретимся попозже!'
+        await callback_query.message.edit_text(text+f'\n\n👉 {msg}')
+        appointment = database.getUserLastAppointment(callback_query.from_user.id)
+        if appointment is not None:
+            database.setAppointmentHappened(appointment[0], False, msg)
+        await callback_query.message.answer("Спасибо, что уделил минутку!\nЭтот опрос в конце недели крайне важен,"
+                                            " он помогает нам становиться лучше \n\n"
+                                            "На связи!")
+
+
 
 @dp.callback_query_handler(lambda c: c.data and c.data=='newcomp')
 async def newCompanion(callback_query: types.CallbackQuery):

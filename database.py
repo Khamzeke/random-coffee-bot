@@ -3,8 +3,9 @@ from datetime import date
 
 import psycopg2
 
-conn = psycopg2.connect(dbname='dbms', user='postgres',
-                        password='root', host='localhost')
+#conn = psycopg2.connect(dbname='dbms', user='postgres',
+                        #password='root', host='localhost')
+conn = psycopg2.connect("postgres://kacbkjzgftibae:2ce4001bb7782a22232485fe7c99fdbde2d5ef0274dd63c6db69e3b71e5e3117@ec2-54-228-125-183.eu-west-1.compute.amazonaws.com:5432/d1343br5270dik")
 cursor = conn.cursor()
 
 
@@ -98,13 +99,13 @@ def getCompanionProfile(id):
         conn.rollback()
 
 def getUserLastAppointment(id):
-    sql = f"select * from appointments where fcompanion = {id} or scompanion = {id} order by id desc fetch next 1 rows only"
+    sql = f"select * from appointments where fcompanion = {id} or scompanion = {id} and hdate - current_date <= 7 order by id desc fetch next 1 rows only"
     cursor.execute(sql)
     appointment = cursor.fetchone()
     if appointment is not None:
         if appointment[3] is not None:
+            print(f'[ERROR] Unavailable user appointment [{id}]')
             return None
-        print(f'[ERROR] Unavailable user appointment [{id}]')
     return appointment
 
 def setAnswerDate(id, period):
@@ -148,4 +149,19 @@ def getUserCompanion(id):
         companion_id = appointment[1]
     sql = f"select * from users where id = {companion_id}"
     cursor.execute(sql)
-    return cursor.fetchall()
+    return cursor.fetchone()
+
+def setAppointmentHappened(id,happened, format):
+    print('[LOG] Appointment format/happened updating')
+    if happened:
+        sql = f"update appointments set happened={happened}, format='{format}' where id={id}"
+        print(f'[LOG] Appointment was happened {format}')
+    else:
+        sql = f"update appointments set happened={happened}, reason='{format}' where id={id}"
+        print(f'[LOG] Appointment was not happened')
+    try:
+        cursor.execute(sql)
+        conn.commit()
+    except:
+        conn.rollback()
+        print('[ERROR] Cannot update appointment format/reason')
