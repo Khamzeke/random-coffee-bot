@@ -36,7 +36,7 @@ def inputUsers(values, num):
         }
     ).execute()
 def inputAppointments(values, num):
-    range = 'A2:E'+str(num+10)
+    range = 'A2:F'+str(num+10)
     values = json.dumps(values, default=str)
     values = json.loads(values)
     service.spreadsheets().values().batchUpdate(

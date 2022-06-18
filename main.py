@@ -281,6 +281,7 @@ async def on_startup(_):
     asyncio.create_task(searching())
     sheet_base.inputAppointments(database.getAppointments(), len(database.getAppointments()))
     print('Бот успешно запущен!')
+    await bot.send_message(347821020, 'Бот запущен!')
 
 
 executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
